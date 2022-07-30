@@ -1,9 +1,10 @@
 import numpy as np
 import common.gridworld_render as render_helper
 
+
 class GridWorld:
     def __init__(self) -> None:
-        self.action_space = [0,1,2,3]
+        self.action_space = [0, 1, 2, 3]
         self.action_meaning = {
             0: "UP",
             1: "DOWN",
@@ -18,9 +19,9 @@ class GridWorld:
                 [0, 0, 0, 0]
             ]
         )
-        self.goal_state = (0,3)
-        self.wall_state = (1,1)
-        self.start_state = (2,0)
+        self.goal_state = (0, 3)
+        self.wall_state = (1, 1)
+        self.start_state = (2, 0)
         self.agent_state = self.start_state
 
     @property
@@ -41,10 +42,10 @@ class GridWorld:
     def states(self):
         for h in range(self.height):
             for w in range(self.width):
-                yield (h,w)
+                yield (h, w)
 
     def next_state(self, state, action):
-        action_move_map = [(-1,0), (1,0), (0,-1), (0, 1)]
+        action_move_map = [(-1, 0), (1, 0), (0, -1), (0, 1)]
         move = action_move_map[action]
         next_state = (state[0] + move[0], state[1] + move[1])
         ny, nx = next_state
@@ -80,5 +81,3 @@ class GridWorld:
         renderer = render_helper.Renderer(self.reward_map, self.goal_state,
                                           self.wall_state)
         renderer.render_q(q, print_value)
-
-
