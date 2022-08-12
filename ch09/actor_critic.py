@@ -3,8 +3,7 @@ import numpy as np
 from dezero import Model, layers, functions, optimizers
 
 
-class Policy(Model):
-
+class PolicyNet(Model):
     def __init__(self, action_size):
         super().__init__()
         self.l1 = layers.Linear(128)
@@ -16,16 +15,29 @@ class Policy(Model):
         return y
 
 
+class ValueNet(Model):
+    def __init__(self):
+        super().__init__()
+        self.l1 = layers.Linear(128)
+        self.l2 = layers.Linear(1)
+
+    def forward(self, x):
+        y = functions.relu(self.l1(x))
+        y = self.l2(y)
+        return y
+
+
 class Agent:
     def __init__(self) -> None:
         self.gamma = 0.98
-        self.lr = 0.0002
+        self.lr_pi = 0.0002
+        self.lr_v = 0.0005
         self.action_size = 2
 
-        self.memory = []
-        self.pi = Policy(self.action_size)
-        self.optimizer = optimizers.Adam(self.lr)
-        self.optimizer.setup(self.pi)
+        self.pi = PolicyNet(self.action_size)
+        self.v = ValueNet()
+        self.optimizer_pi = optimizers.Adam(self.lr_pi).setup(self.pi)
+        self.optimizer_v = optimizers.Adam(self.lr_v).setup(self.v)
 
     def get_action(self, state):
         state = state[np.newaxis, :]
@@ -34,21 +46,27 @@ class Agent:
         action = np.random.choice(len(probs), p=probs.data)
         return action, probs[action],
 
-    def add(self, reward, prob):
-        data = (reward, prob)
-        self.memory.append(data)
+    def update(self, state, action_prob, reward, next_state, done):
+        state = state[np.newaxis, :]
+        next_state = next_state[np.newaxis, :]
 
-    def update(self):
+        # 価値関数の更新
+        target = reward + self.gamma * self.v(next_state) * (1 - done)
+        target.unchain()
+        v = self.v(state)
+        loss_v = functions.mean_squared_error(v, target)
+
+        # 方策の更新
+        delta = target - v
+        delta.unchain()
+        loss_pi = -functions.log(action_prob) * delta
+
+        self.v.cleargrads()
         self.pi.cleargrads()
-
-        G, loss = 0, 0
-        for reward, prob in reversed(self.memory):
-            G = reward + self.gamma * G
-            loss += - G * functions.log(prob)
-
-        loss.backward()
-        self.optimizer.update()
-        self.memory = []
+        loss_v.backward()
+        loss_pi.backward()
+        self.optimizer_v.update()
+        self.optimizer_pi.update()
 
 
 episodes = 3000
@@ -65,11 +83,10 @@ for episode in range(episodes):
         action, prob = agent.get_action(state)
         next_state, reward, done, info = env.step(action)
 
-        agent.add(reward, prob)
+        agent.update(state, prob, reward, next_state, done)
         state = next_state
         total_reward += reward
 
-    agent.update()
     reward_history.append(total_reward)
     if episode % 100 == 0:
         print("episode :{}, total reward : {:.1f}".format(episode, total_reward))
@@ -78,3 +95,5 @@ for episode in range(episodes):
 from common.utils import plot_total_reward
 
 plot_total_reward(reward_history)
+
+
